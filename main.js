@@ -2,7 +2,6 @@ const { app, Tray, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const { GlobalKeyboardListener } = require('node-global-key-listener');
 const Store = require('electron-store');
-const activeWin = require('active-win');
 
 const SYSTRAY_ICON = (process.platform === 'darwin') ? path.join(__dirname, '/assets/images/icon_18x18.png') : path.join(__dirname, '/assets/images/icon.png');
 const SYSTRAY_ICON_OFF = (process.platform === 'darwin') ? path.join(__dirname, '/assets/images/icon_off_18x18.png') : path.join(__dirname, '/assets/images/icon_off.png');
@@ -71,7 +70,8 @@ ipcMain.on('minimize-window', (e) => {
 ipcMain.on('get-app-info', (e) => {
     e.returnValue = {
         version: app.getVersion(),
-        name: app.getName()
+        name: app.getName(),
+        platform: process.platform
     }
 });
 
@@ -80,10 +80,15 @@ var tray = null;
 var disabled = !preferences.get('always_enabled');
 let lastActiveWindow = null;
 let activeWindows = [];
+let getActiveWindowFn = null;
 
 // check for active window changes and update `lastActiveWindow` when the window changes
 async function monitorActiveWindow() {
-    const activeWindow = await activeWin();
+    if (!getActiveWindowFn) {
+        getActiveWindowFn = (await import('get-windows')).activeWindow;
+    }
+
+    const activeWindow = await getActiveWindowFn();
     if (!activeWindow?.owner?.name) return;// return early if invlaid window
 
     const winName = activeWindow.owner.name
@@ -119,7 +124,8 @@ function createMainWin() {
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
-            nodeIntegration: false
+            nodeIntegration: false,
+            sandbox: false
         }
     });
     bgwin.removeMenu();
