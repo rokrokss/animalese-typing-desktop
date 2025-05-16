@@ -28,7 +28,11 @@
     },
     "mac": {
       "target": "dmg",
-      "icon": "assets/images/icon.png"
+      "arch": ["x64", "arm64"],
+      "icon": "assets/images/icon.png",
+      "extendInfo": {
+        "NSInputMonitoringUsageDescription": "This app needs access to detect key presses."
+      }
     },
     "linux": {
       "target": ["AppImage", "deb"],
@@ -43,7 +47,7 @@
     "active-win": "^8.2.1",
     "electron-store": "^6.0.1",
     "howler": "^2.2.4",
-    "iohook": "^0.9.3"
+    "node-global-key-listener": "^0.1.1"
   },
   "devDependencies": {
     "electron": "^12.2.3",
@@ -59,7 +63,8 @@
       "linux"
     ],
     "arches": [
-      "x64"
+      "x64",
+      "arm64"
     ]
   }
 }

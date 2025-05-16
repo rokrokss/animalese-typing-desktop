@@ -1,13 +1,15 @@
 const { app, Tray, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
-const iohook = require('iohook');
+const { GlobalKeyboardListener } = require('node-global-key-listener');
 const Store = require('electron-store');
 const activeWin = require('active-win');
 
-const SYSTRAY_ICON = path.join(__dirname, '/assets/images/icon.png');
-const SYSTRAY_ICON_OFF = path.join(__dirname, '/assets/images/icon_off.png');
+const SYSTRAY_ICON = (process.platform === 'darwin') ? path.join(__dirname, '/assets/images/icon_18x18.png') : path.join(__dirname, '/assets/images/icon.png');
+const SYSTRAY_ICON_OFF = (process.platform === 'darwin') ? path.join(__dirname, '/assets/images/icon_off_18x18.png') : path.join(__dirname, '/assets/images/icon_off.png');
 const ICON = path.join(__dirname, '/assets/images/icon.png');
 const gotTheLock = app.requestSingleInstanceLock();
+
+let keyboardListener = null;
 
 function showIfAble() { // focus the existing window if it exists
     if (bgwin) {
@@ -24,7 +26,11 @@ function setDisable(value) {
         tray.setImage(disabled?SYSTRAY_ICON_OFF:SYSTRAY_ICON);
         tray.setToolTip(disabled?'Animalese Typing: Disabled':'Animalese Typing');
     }
-    if (disabled) iohook.stop(); else iohook.start();
+    if (disabled) {
+        if (keyboardListener) keyboardListener.kill();
+    } else {
+        startKeyboardListener();
+    }
 }
 
 if (!gotTheLock) app.quit(); // if another instance is already running then quit
@@ -103,8 +109,8 @@ app.disableHardwareAcceleration();
 function createMainWin() {
     if(bgwin !== null) return;
     bgwin = new BrowserWindow({
-        width: 0,
-        height: 0,
+        width: 720,
+        height: 360,
         icon: ICON,
         resizable: true,
         frame: false,
@@ -116,6 +122,7 @@ function createMainWin() {
             nodeIntegration: false
         }
     });
+    bgwin.webContents.openDevTools({ mode: 'detach' });
     bgwin.removeMenu();
     bgwin.loadFile('editor.html');
     bgwin.setAspectRatio(2);
@@ -148,9 +155,14 @@ function createTrayIcon() {
     if(tray !== null) return; // prevent dupe tray icons
 
     tray = new Tray(SYSTRAY_ICON);
+
     tray.setToolTip('Animalese Typing');
 
     const contextMenu = Menu.buildFromTemplate([
+        {
+            label: 'Show Settings',
+            click: () => { showIfAble(); }
+        },
         {
             label: 'Run on startup',
             type: 'checkbox',
@@ -165,14 +177,18 @@ function createTrayIcon() {
         {
             label: 'Quit',
             click: () => {
-                iohook.unload();
-                iohook.stop();
+                if (keyboardListener) keyboardListener.kill();
                 app.quit();
             }
         }
     ]);
     tray.setContextMenu(contextMenu);
-    tray.on('click', () => { showIfAble(); });
+
+    // On Windows, clicking shows the window, while on macOS it shows the context menu
+    if (process.platform === 'win32') {
+        tray.on('click', () => { showIfAble(); });
+    }
+
     tray.displayBalloon({
         title: "Animalese Typing",
         content: "Animalese Typing is Running!"
@@ -183,6 +199,7 @@ app.whenReady().then(() => {
     startActiveWindowMonitoring();
     createMainWin();
     createTrayIcon();
+    if (!disabled) startKeyboardListener();
     if (process.platform === 'darwin') app.dock.hide();
     bgwin.hide();
 });
@@ -191,23 +208,12 @@ app.on('activate', function () {
     if (bgwin === null) createMainWin();
 });
 
-app.on('ready', () => {
-    if (!disabled) iohook.start();
-    iohook.on('keydown', e => {
-        bgwin.webContents.send('keydown', e);
-    });
-    iohook.on('keyup', e => {
-        bgwin.webContents.send('keyup', e);
-    });
-});
-
 app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('before-quit', () => {
-    iohook.unload();
-    iohook.stop();
+    if (keyboardListener) keyboardListener.kill();
 
     if (bgwin) {
         bgwin.removeAllListeners();
@@ -219,3 +225,28 @@ app.on('before-quit', () => {
 });
 
 app.on('quit', () =>  app.exit(0) );
+
+function startKeyboardListener() {
+    if (keyboardListener) {
+        keyboardListener.kill();
+    }
+
+    keyboardListener = new GlobalKeyboardListener();
+
+    keyboardListener.addListener((e, down) => {
+        const shiftKey = (down["LEFT SHIFT"] || down["RIGHT SHIFT"]) && !["LEFT SHIFT", "RIGHT SHIFT"].includes(e.name);
+        if (e.state === 'DOWN') {
+            bgwin.webContents.send('keydown', {
+                keycode: e.vKey,
+                keychar: e.rawKey.name,
+                shiftKey: shiftKey,
+            });
+        } else if (e.state === 'UP') {
+            bgwin.webContents.send('keyup', {
+                keycode: e.vKey,
+                keychar: e.rawKey.name,
+                shiftKey: shiftKey,
+            });
+        }
+    });
+}
