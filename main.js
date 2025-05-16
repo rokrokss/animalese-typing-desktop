@@ -122,7 +122,6 @@ function createMainWin() {
             nodeIntegration: false
         }
     });
-    bgwin.webContents.openDevTools({ mode: 'detach' });
     bgwin.removeMenu();
     bgwin.loadFile('editor.html');
     bgwin.setAspectRatio(2);
