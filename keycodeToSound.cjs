@@ -209,7 +209,7 @@ const darwin = {
 /* , */             43: { key: ',', sound: 'sfx.default', shiftKey: '<', shiftSound: 'sfx.default' },//TODO: add sound for 'comma'/'less than'
 /* . */             47: { key: '.', sound: 'sfx.default', shiftKey: '>', shiftSound: 'sfx.default' },//TODO: add sound for 'period'/'greater than'
 
-/* Space */         49: { key: 'Space', sound: '' },
+/* Space */         49: { key: 'Space', sound: 'sfx.tab' },
 
 /* PrintScreen */   3639: { key: 'PrintScreen', sound: '' },
 /* ScrollLock */    70: { key: 'ScrollLock', sound: '' },
